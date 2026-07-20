@@ -219,7 +219,7 @@ variable "kms_key_arn" {
  description = <<EOT
 ARN, key id, or alias of a customer-managed KMS key (CMK) used for SSE-KMS.
 Null (default) uses the AWS-managed key alias/aws/sns when enable_encryption
-is true. Wire from tf-mod-aws-kms (arn output) for a CMK. Ignored entirely
+is true. Wire from terraform-aws-kms (arn output) for a CMK. Ignored entirely
 when enable_encryption is false.
 
 NOTE: the CMK's own key policy (NOT this module's caller identity) must grant
@@ -317,7 +317,7 @@ Per-subscription fields:
  - subscription_role_arn: (Required when protocol = "firehose") IAM
  role ARN SNS assumes to publish to the
  Kinesis Data Firehose delivery stream.
- Wire from tf-mod-aws-iam-role.
+ Wire from terraform-aws-iam-role.
  - raw_message_delivery: (Optional) Deliver the raw message body
  instead of wrapping it in the SNS JSON
  envelope. Default false.

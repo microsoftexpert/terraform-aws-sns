@@ -1,4 +1,4 @@
-# tf-mod-aws-sns — SCOPE
+# terraform-aws-sns — SCOPE
 
 Composite **app-integration** module for a secure-by-default Amazon SNS topic.
 It owns the topic and its directly-attached sub-resources — access policy,
@@ -23,22 +23,22 @@ The module manages **all** of the following (allow-list):
 
 Referenced by `arn`/`id`, never created here:
 
-- KMS CMK for SSE-KMS — supplied by `tf-mod-aws-kms` via `kms_key_arn`/`kms_master_key_id`
+- KMS CMK for SSE-KMS — supplied by `terraform-aws-kms` via `kms_key_arn`/`kms_master_key_id`
   (optional; `null` default uses the AWS-managed `alias/aws/sns` key). The CMK's
   **key policy** (not this module's IAM identity) must grant the publishing/
   subscribing principals `kms:Decrypt` / `kms:GenerateDataKey` — see Required
   IAM permissions below.
-- SQS subscription endpoints — queue `arn` from `tf-mod-aws-sqs`. This module
+- SQS subscription endpoints — queue `arn` from `terraform-aws-sqs`. This module
   does not create or modify the queue's redrive policy or queue policy; the
-  caller (or `tf-mod-aws-sqs`) must grant the topic `sqs:SendMessage` on the
+  caller (or `terraform-aws-sqs`) must grant the topic `sqs:SendMessage` on the
   queue policy.
 - Lambda subscription endpoints — function `arn` from a **not-yet-authored**
-  `tf-mod-aws-lambda` (Phase 7 in the roadmap). Wired by reference only; no
+  `terraform-aws-lambda` (Phase 7 in the roadmap). Wired by reference only; no
   dependency on that module exists yet. The caller is responsible for the
   Lambda resource-based policy granting `sns.amazonaws.com` `lambda:InvokeFunction`.
 - Kinesis Data Firehose subscription endpoints — delivery stream `arn` from
-  `tf-mod-aws-kinesis-firehose` (Phase 2 sibling), plus a `subscription_role_arn`
-  (IAM role `arn` from `tf-mod-aws-iam-role`) that SNS assumes to publish to
+  `terraform-aws-kinesis-firehose` (Phase 2 sibling), plus a `subscription_role_arn`
+  (IAM role `arn` from `terraform-aws-iam-role`) that SNS assumes to publish to
   Firehose — required by the provider whenever `protocol = "firehose"`.
 - Literal HTTP(S) / email / email-json / SMS / mobile-application endpoints —
   supplied directly by the caller as plain strings (URL, address, phone number,
@@ -51,12 +51,12 @@ but wires several optional inputs by ARN from sibling modules.
 
 | Input | Type | Source module |
 |---|---|---|
-| `kms_key_arn` (mapped to `kms_master_key_id`) | `string`, optional, default `null` | `tf-mod-aws-kms` (or literal `"alias/aws/sns"` / AWS key id) |
-| Subscription `endpoint` (protocol `sqs`) | `string` (queue ARN) | `tf-mod-aws-sqs` |
-| Subscription `endpoint` (protocol `lambda`) | `string` (function ARN) | `tf-mod-aws-lambda` — **not yet authored (Phase 7)**, reference-only today |
-| Subscription `endpoint` (protocol `firehose`) + `subscription_role_arn` | `string` (stream ARN) + `string` (role ARN) | `tf-mod-aws-kinesis-firehose` + `tf-mod-aws-iam-role` |
+| `kms_key_arn` (mapped to `kms_master_key_id`) | `string`, optional, default `null` | `terraform-aws-kms` (or literal `"alias/aws/sns"` / AWS key id) |
+| Subscription `endpoint` (protocol `sqs`) | `string` (queue ARN) | `terraform-aws-sqs` |
+| Subscription `endpoint` (protocol `lambda`) | `string` (function ARN) | `terraform-aws-lambda` — **not yet authored (Phase 7)**, reference-only today |
+| Subscription `endpoint` (protocol `firehose`) + `subscription_role_arn` | `string` (stream ARN) + `string` (role ARN) | `terraform-aws-kinesis-firehose` + `terraform-aws-iam-role` |
 | Subscription `endpoint` (protocol `http`/`https`/`email`/`email-json`/`sms`/`application`) | `string` (literal) | Caller-supplied, no module dependency |
-| Custom topic access policy JSON | `string`, optional | Caller-authored `data.aws_iam_policy_document`, or `tf-mod-aws-iam-policy` pattern reused inline |
+| Custom topic access policy JSON | `string`, optional | Caller-authored `data.aws_iam_policy_document`, or `terraform-aws-iam-policy` pattern reused inline |
 
 ## Required IAM permissions
 
@@ -74,7 +74,7 @@ Least-privilege actions the Terraform identity needs:
 
 > **KMS key-policy note:** `kms:Decrypt`, `kms:GenerateDataKey*`, and
 > `kms:Encrypt` for a **customer-managed key** are granted on the **KMS key's
-> resource policy** (authored by `tf-mod-aws-kms`), not on this module's
+> resource policy** (authored by `terraform-aws-kms`), not on this module's
 > caller identity. This module only needs `kms:DescribeKey` to validate the
 > key reference. Forgetting to update the CMK's key policy to trust
 > `sns.amazonaws.com` (and the publishing/subscribing principals) is the most
@@ -112,7 +112,7 @@ Least-privilege actions the Terraform identity needs:
 | Output | Description | Consumed by |
 |---|---|---|
 | `id` | Topic ARN — **NOTE:** for `aws_sns_topic`, `id` and `arn` are the identical value (AWS quirk; SNS has no separate short id). Emitted anyway per house rule. | Any module referencing the topic generically |
-| `arn` | Topic ARN (`arn:aws:sns:<region>:<account-id>:<name>`) — cross-resource reference type | `tf-mod-aws-sqs` (queue policy `Condition.ArnEquals`), `tf-mod-aws-iam-policy` (publish/subscribe permissions), `tf-mod-aws-cloudwatch-log-group` (alarm actions), `tf-mod-aws-lambda` (event source / DLQ target, once authored) |
+| `arn` | Topic ARN (`arn:aws:sns:<region>:<account-id>:<name>`) — cross-resource reference type | `terraform-aws-sqs` (queue policy `Condition.ArnEquals`), `terraform-aws-iam-policy` (publish/subscribe permissions), `terraform-aws-cloudwatch-log-group` (alarm actions), `terraform-aws-lambda` (event source / DLQ target, once authored) |
 | `name` | Topic name | Tagging, monitoring, dashboards, naming-convention audits |
 | `owner` | AWS account id of the topic owner | Cross-account policy authoring, audit |
 | `beginning_archive_time` | Oldest replayable timestamp for a FIFO topic with `archive_policy_json` set; empty otherwise | FIFO replay tooling |
@@ -193,10 +193,10 @@ Least-privilege actions the Terraform identity needs:
   message bodies) that adds processing overhead, so it is opt-in rather than
   assumed for every topic.
 - Lambda and Kinesis Firehose subscription targets are documented as
-  reference-only inputs even though `tf-mod-aws-lambda` does not exist yet
+  reference-only inputs even though `terraform-aws-lambda` does not exist yet
   (Phase 7) — the subscription `object()` schema accepts any ARN string today
   so this module does not need to change when that module ships later.
-- `kms_master_key_id` accepts either a full CMK ARN/id (from `tf-mod-aws-kms`)
+- `kms_master_key_id` accepts either a full CMK ARN/id (from `terraform-aws-kms`)
   or an alias string, matching the provider's own flexibility, rather than
   forcing callers through a single input shape.
 - The keystone also exposes the remaining `aws_sns_topic` topic-level
@@ -218,7 +218,7 @@ Least-privilege actions the Terraform identity needs:
 - Neither `aws_sns_topic` nor any AWS API surfaces a `timeouts {}` block for
   SNS resources (confirmed against the live v6.53.0 provider schema and
   documentation during authoring) — this module intentionally has no
-  `timeouts` variable, consistent with `tf-mod-aws-kms`'s precedent of
+  `timeouts` variable, consistent with `terraform-aws-kms`'s precedent of
   omitting it when the underlying resource doesn't support one.
 - `name_prefix` (an alternative to `name` that lets AWS auto-generate a unique
   suffix) is deliberately NOT exposed — Casey's governance/tagging conventions

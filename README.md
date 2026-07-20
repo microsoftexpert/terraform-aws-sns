@@ -13,7 +13,7 @@
 ## 🧩 Overview
 
 - 📨 Provisions an **`aws_sns_topic`** keystone — standard or FIFO — plus its directly-attached sub-resources in one call.
-- 🔒 **SSE-KMS encryption ON by default** — `kms_master_key_id` defaults to the AWS-managed `alias/aws/sns` key; wire a customer-managed CMK from `tf-mod-aws-kms` with one variable.
+- 🔒 **SSE-KMS encryption ON by default** — `kms_master_key_id` defaults to the AWS-managed `alias/aws/sns` key; wire a customer-managed CMK from `terraform-aws-kms` with one variable.
 - 🛡️ **Owner-account-only access policy by default** — no `aws_sns_topic_policy` resource is created unless you supply a custom policy document, so SNS's own default (no cross-account/public access) stays in force.
 - 🧵 **FIFO support** — strict ordering, content-based deduplication, and high-throughput `MessageGroup` deduplication scope, with a `validation {}` block enforcing the `.fifo` name suffix.
 - 🪝 **`for_each`-driven subscriptions** — a `map(object(...))` keyed by a caller-chosen stable name covers `sqs`, `lambda`, `firehose`, `application`, `sms`, `http`, `https`, `email`, and `email-json`, including filter policies, redrive policies, and raw message delivery.
@@ -39,21 +39,21 @@ Whether it's a star, a professional connection, or a coffee, every gesture helps
 
 ## 🗺️ Where this fits in the family
 
-`tf-mod-aws-sns` is a **Phase 2 (app_integration)** module. It originates the topic and is consumed by reference (ARN) by SQS, Kinesis Firehose, Lambda (once authored), and CloudWatch-alarm/Cost-Anomaly-Detection notification targets across the library. Its own optional inputs are by-reference: a CMK from `tf-mod-aws-kms` and an IAM role from `tf-mod-aws-iam-role` for Firehose subscriptions.
+`terraform-aws-sns` is a **Phase 2 (app_integration)** module. It originates the topic and is consumed by reference (ARN) by SQS, Kinesis Firehose, Lambda (once authored), and CloudWatch-alarm/Cost-Anomaly-Detection notification targets across the library. Its own optional inputs are by-reference: a CMK from `terraform-aws-kms` and an IAM role from `terraform-aws-iam-role` for Firehose subscriptions.
 
 ```mermaid
 flowchart LR
- kms["tf-mod-aws-kms"]
- iamrole["tf-mod-aws-iam-role"]
- sqs["tf-mod-aws-sqs"]
- sns["tf-mod-aws-sns"]
- kstream["tf-mod-aws-kinesis-stream"]
- kfirehose["tf-mod-aws-kinesis-firehose"]
- msk["tf-mod-aws-msk"]
- mq["tf-mod-aws-mq"]
- lambda["tf-mod-aws-lambda (Phase 7, not yet authored)"]
- cwlg["tf-mod-aws-cloudwatch-log-group"]
- costmgmt["tf-mod-aws-cost-management"]
+ kms["terraform-aws-kms"]
+ iamrole["terraform-aws-iam-role"]
+ sqs["terraform-aws-sqs"]
+ sns["terraform-aws-sns"]
+ kstream["terraform-aws-kinesis-stream"]
+ kfirehose["terraform-aws-kinesis-firehose"]
+ msk["terraform-aws-msk"]
+ mq["terraform-aws-mq"]
+ lambda["terraform-aws-lambda (Phase 7, not yet authored)"]
+ cwlg["terraform-aws-cloudwatch-log-group"]
+ costmgmt["terraform-aws-cost-management"]
 
  kms -. "kms_key_arn (optional CMK)".-> sns
  iamrole -. "subscription_role_arn (firehose protocol)".-> sns
@@ -67,7 +67,7 @@ flowchart LR
  style sns fill:#FF9900,color:#fff,stroke:#cc7a00,stroke-width:2px
 ```
 
-> ℹ️ `tf-mod-aws-kinesis-stream`, `tf-mod-aws-msk`, and `tf-mod-aws-mq` are Phase 2 siblings shown for family context; none of the three consumes or is consumed by this module directly today.
+> ℹ️ `terraform-aws-kinesis-stream`, `terraform-aws-msk`, and `terraform-aws-mq` are Phase 2 siblings shown for family context; none of the three consumes or is consumed by this module directly today.
 
 ---
 
@@ -75,7 +75,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
- subgraph SNSMOD["tf-mod-aws-sns"]
+ subgraph SNSMOD["terraform-aws-sns"]
  topic["aws_sns_topic.this<br/>(keystone -- standard or FIFO)"]
  policy["aws_sns_topic_policy.this<br/>(0-1, only when topic_policy_json set)"]
  dpp["aws_sns_topic_data_protection_policy.this<br/>(0-1, only when data_protection_policy_json set)"]
@@ -86,8 +86,8 @@ flowchart TB
  topic --> dpp
  topic --> subs
 
- subs -- "protocol = sqs" --> sqsq[("SQS queue<br/>(tf-mod-aws-sqs)")]
- subs -- "protocol = firehose<br/>+ subscription_role_arn" --> firehose[("Kinesis Firehose<br/>(tf-mod-aws-kinesis-firehose)")]
+ subs -- "protocol = sqs" --> sqsq[("SQS queue<br/>(terraform-aws-sqs)")]
+ subs -- "protocol = firehose<br/>+ subscription_role_arn" --> firehose[("Kinesis Firehose<br/>(terraform-aws-kinesis-firehose)")]
  subs -- "protocol = lambda" --> lambdafn[("Lambda function<br/>(reference only)")]
  subs -- "protocol = http/https/email/<br/>email-json/sms/application" --> extep[("Caller-supplied endpoint")]
 
@@ -131,7 +131,7 @@ Least-privilege actions the Terraform identity needs to create, read, update, an
 
 > ℹ️ **No service-linked role is created or required for SNS.**
 >
-> ⚠️ **KMS key-policy note:** `kms:Decrypt`, `kms:GenerateDataKey*`, and `kms:Encrypt` for a **customer-managed key** are granted on the **KMS key's own resource policy** (authored by `tf-mod-aws-kms`), not on this module's caller identity or on the publishing/subscribing principals' IAM policies. This module's Terraform identity only needs `kms:DescribeKey`. Forgetting to update the CMK's key policy to trust `sns.amazonaws.com` and the relevant publish/subscribe principals is the most common cause of a `KMS.AccessDeniedException` at publish time, not a Terraform-apply-time failure.
+> ⚠️ **KMS key-policy note:** `kms:Decrypt`, `kms:GenerateDataKey*`, and `kms:Encrypt` for a **customer-managed key** are granted on the **KMS key's own resource policy** (authored by `terraform-aws-kms`), not on this module's caller identity or on the publishing/subscribing principals' IAM policies. This module's Terraform identity only needs `kms:DescribeKey`. Forgetting to update the CMK's key policy to trust `sns.amazonaws.com` and the relevant publish/subscribe principals is the most common cause of a `KMS.AccessDeniedException` at publish time, not a Terraform-apply-time failure.
 
 ---
 
@@ -150,7 +150,7 @@ Least-privilege actions the Terraform identity needs to create, read, update, an
 ## 📁 Module Structure
 
 ```
-tf-mod-aws-sns/
+terraform-aws-sns/
 ├── providers.tf # terraform{} + required_providers (aws >= 6.0, < 7.0); no provider block
 ├── variables.tf # name, FIFO config, topic config, delivery logging, encryption, policies, subscriptions, tags
 ├── main.tf # locals (policy/DPP gating, effective KMS key) + the four resources
@@ -165,14 +165,14 @@ tf-mod-aws-sns/
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "billing-events"
 
   subscriptions = {
     billing-queue = {
       protocol = "sqs"
-      endpoint = module.sqs_billing.arn # tf-mod-aws-sqs
+      endpoint = module.sqs_billing.arn # terraform-aws-sqs
     }
   }
 
@@ -195,21 +195,21 @@ Primarily a **standalone-with-references** module — it originates the topic bu
 
 | Input | Type | Source module |
 |---|---|---|
-| `kms_key_arn` (mapped to `kms_master_key_id`) | `string`, optional, default `null` | `tf-mod-aws-kms` (or a literal `"alias/aws/sns"` / key id) |
-| `subscriptions[*].endpoint` (protocol `sqs`) | `string` (queue ARN) | `tf-mod-aws-sqs` |
-| `subscriptions[*].endpoint` (protocol `lambda`) | `string` (function ARN) | `tf-mod-aws-lambda` — **not yet authored (Phase 7)**, reference-only today |
-| `subscriptions[*].endpoint` + `subscription_role_arn` (protocol `firehose`) | `string` (stream ARN) + `string` (role ARN) | `tf-mod-aws-kinesis-firehose` + `tf-mod-aws-iam-role` |
+| `kms_key_arn` (mapped to `kms_master_key_id`) | `string`, optional, default `null` | `terraform-aws-kms` (or a literal `"alias/aws/sns"` / key id) |
+| `subscriptions[*].endpoint` (protocol `sqs`) | `string` (queue ARN) | `terraform-aws-sqs` |
+| `subscriptions[*].endpoint` (protocol `lambda`) | `string` (function ARN) | `terraform-aws-lambda` — **not yet authored (Phase 7)**, reference-only today |
+| `subscriptions[*].endpoint` + `subscription_role_arn` (protocol `firehose`) | `string` (stream ARN) + `string` (role ARN) | `terraform-aws-kinesis-firehose` + `terraform-aws-iam-role` |
 | `subscriptions[*].endpoint` (protocol `http`/`https`/`email`/`email-json`/`sms`/`application`) | `string` (literal) | Caller-supplied, no module dependency |
 | `topic_policy_json` | `string`, optional | Caller-authored `data.aws_iam_policy_document` |
 | `data_protection_policy_json` | `string`, optional | Caller-authored via `jsonencode` |
-| `delivery_status_logging[*].*_role_arn` | `string` (IAM role ARN) | `tf-mod-aws-iam-role` |
+| `delivery_status_logging[*].*_role_arn` | `string` (IAM role ARN) | `terraform-aws-iam-role` |
 
 ### Emits
 
 | Output | Description | Consumed by |
 |---|---|---|
 | `id` | Topic ARN (identical to `arn` — see Architecture Notes) | Any module referencing the topic generically |
-| `arn` | Topic ARN (`arn:aws:sns:<region>:<account-id>:<name>`) | `tf-mod-aws-sqs` (queue policy `Condition.ArnEquals`), `tf-mod-aws-iam-policy` (publish/subscribe grants), CloudWatch alarm actions, Lambda event-source/DLQ targets |
+| `arn` | Topic ARN (`arn:aws:sns:<region>:<account-id>:<name>`) | `terraform-aws-sqs` (queue policy `Condition.ArnEquals`), `terraform-aws-iam-policy` (publish/subscribe grants), CloudWatch alarm actions, Lambda event-source/DLQ targets |
 | `name` | Topic name | Tagging, monitoring, naming-convention audits |
 | `owner` | AWS account id of the topic owner | Cross-account policy authoring, audit |
 | `topic_policy_attached` | Whether a custom access policy was created | Audit / drift checks |
@@ -227,7 +227,7 @@ Primarily a **standalone-with-references** module — it originates the topic bu
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "app-events"
 }
@@ -240,7 +240,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name                        = "orders.fifo"
   fifo_topic                  = true
@@ -261,7 +261,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name                  = "trades.fifo"
   fifo_topic            = true
@@ -290,7 +290,7 @@ provider "aws" {
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "tagged-topic"
 
@@ -304,18 +304,18 @@ module "sns" {
 </details>
 
 <details>
-<summary><b>5 · Customer-managed KMS key (wired from tf-mod-aws-kms)</b></summary>
+<summary><b>5 · Customer-managed KMS key (wired from terraform-aws-kms)</b></summary>
 
 ```hcl
 module "kms" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-kms?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-kms?ref=v1.0.0"
   name   = "sns-cmk"
 
   key_service_principals = ["sns.amazonaws.com"] # key policy must trust SNS
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name        = "encrypted-events"
   kms_key_arn = module.kms.arn
@@ -329,7 +329,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "fulfillment-events"
 
@@ -344,7 +344,7 @@ module "sns" {
 
 # This module does NOT create the queue's policy. Grant sns.amazonaws.com
 # sqs:SendMessage on the queue policy, scoped to this topic's arn, alongside
-# tf-mod-aws-sqs:
+# terraform-aws-sqs:
 data "aws_iam_policy_document" "fulfillment_queue_policy" {
   statement {
     sid     = "AllowSNSPublish"
@@ -373,7 +373,7 @@ data "aws_iam_policy_document" "fulfillment_queue_policy" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "webhook-events"
 
@@ -400,7 +400,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "ops-alerts"
 
@@ -423,20 +423,20 @@ module "sns" {
 
 ```hcl
 module "firehose_subscribe_role" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-iam-role?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-iam-role?ref=v1.0.0"
   name   = "sns-to-firehose"
   # trust policy: sns.amazonaws.com; permissions: firehose:PutRecord* on the target stream
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "audit-events"
 
   subscriptions = {
     firehose-archive = {
       protocol              = "firehose"
-      endpoint              = module.firehose_archive.arn # tf-mod-aws-kinesis-firehose
+      endpoint              = module.firehose_archive.arn # terraform-aws-kinesis-firehose
       subscription_role_arn = module.firehose_subscribe_role.arn
     }
   }
@@ -446,11 +446,11 @@ module "sns" {
 </details>
 
 <details>
-<summary><b>10 · Lambda subscription (reference-only — tf-mod-aws-lambda not yet authored)</b></summary>
+<summary><b>10 · Lambda subscription (reference-only — terraform-aws-lambda not yet authored)</b></summary>
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "order-created"
 
@@ -462,7 +462,7 @@ module "sns" {
   }
 }
 
-# tf-mod-aws-lambda is a Phase 7 module and does not exist yet. Until it ships,
+# terraform-aws-lambda is a Phase 7 module and does not exist yet. Until it ships,
 # wire the function ARN as a literal string or a remote-state / data-source
 # lookup. The receiving Lambda's own resource-based policy must separately
 # grant sns.amazonaws.com lambda:InvokeFunction, scoped to this topic's arn --
@@ -475,7 +475,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "customer-notifications"
 
@@ -537,7 +537,7 @@ data "aws_iam_policy_document" "cross_account_publish" {
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name              = "partner-integration"
   topic_policy_json = data.aws_iam_policy_document.cross_account_publish.json
@@ -550,7 +550,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name              = "public-status-page"
   enable_encryption = false # opt-out of the SSE-KMS baseline
@@ -568,7 +568,7 @@ module "sns" {
 
 ```hcl
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "loan-decisioning-events"
 
@@ -606,7 +606,7 @@ import {
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name = "legacy-notifications"
   #... match the imported topic's existing configuration before applying
@@ -619,26 +619,26 @@ module "sns" {
 
 ```hcl
 module "kms" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-kms?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-kms?ref=v1.0.0"
   name   = "events-cmk"
 
   key_service_principals = ["sns.amazonaws.com", "sqs.amazonaws.com"]
 }
 
 module "sqs_billing" {
-  source      = "git::https://github.com/microsoftexpert/tf-mod-aws-sqs?ref=v1.0.0"
+  source      = "git::https://github.com/microsoftexpert/terraform-aws-sqs?ref=v1.0.0"
   name        = "billing-events"
   kms_key_arn = module.kms.arn
 }
 
 module "firehose_subscribe_role" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-iam-role?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-iam-role?ref=v1.0.0"
   name   = "sns-to-firehose-billing"
   # trust policy: sns.amazonaws.com
 }
 
 module "sns" {
-  source = "git::https://github.com/microsoftexpert/tf-mod-aws-sns?ref=v1.0.0"
+  source = "git::https://github.com/microsoftexpert/terraform-aws-sns?ref=v1.0.0"
 
   name        = "billing-events"
   kms_key_arn = module.kms.arn
@@ -713,7 +713,7 @@ data "aws_iam_policy_document" "billing_queue_policy" {
 
 ## 🧠 Architecture Notes
 
-- **ARN / ID formats:** `arn:aws:sns:<region>:<account-id>:<name>`. **`id` and `arn` are the identical value** — unlike most AWS resources, SNS topics have no separate short resource id. Both are still emitted as distinct outputs to keep this module's contract consistent with every other `tf-mod-aws-*` module. Subscription ARNs append `:<subscription-uuid>` to the topic ARN.
+- **ARN / ID formats:** `arn:aws:sns:<region>:<account-id>:<name>`. **`id` and `arn` are the identical value** — unlike most AWS resources, SNS topics have no separate short resource id. Both are still emitted as distinct outputs to keep this module's contract consistent with every other `terraform-aws-*` module. Subscription ARNs append `:<subscription-uuid>` to the topic ARN.
 - **Force-new / immutable fields:** `name` is effectively immutable — SNS has no rename operation, so changing it destroys and recreates `aws_sns_topic.this` and, transitively, every subscription and policy attached to it. `fifo_topic` is immutable (standard ↔ FIFO requires replacement). `content_based_deduplication` is **not** force-new and can be flipped in place on an existing FIFO topic.
 - **`tags` ↔ `tags_all` ↔ `default_tags`:** `var.tags` flows to `aws_sns_topic.this.tags` only — `aws_sns_topic_policy`, `aws_sns_topic_subscription`, and `aws_sns_topic_data_protection_policy` accept **no `tags` argument at all** in the AWS provider schema. `tags_all` is the provider-computed union of the topic's resource tags over the caller's provider `default_tags`; resource tags win on key conflict. `default_tags` is the caller's provider-block concern and is never set inside the module.
 - **Eventual consistency:** a topic-policy attachment can lag one `GetTopicAttributes` read cycle behind an `AddPermission` call in the same apply; a second `apply` (or `refresh`) resolves it. Subscription confirmation for partially-supported protocols (`http`/`https`/`email`/`email-json`) happens entirely outside Terraform's control loop.
@@ -735,7 +735,7 @@ Secure-by-default posture and the explicit opt-out for each:
 | **Delivery status logging** | Off by default — no CloudWatch Logs IAM role required for any protocol | Supply the relevant entry in `delivery_status_logging` to enable per-protocol logging |
 | **FIFO ordering / dedup** | Standard topic by default (`fifo_topic = false`) | Set `fifo_topic = true` (name must end `.fifo`); `content_based_deduplication` and `fifo_throughput_scope` are independent opt-ins |
 
-Other principles: subscriptions modeled as `map(object(...))` keyed by a caller-chosen stable name (never a list) so adding/removing one subscription never perturbs the others under `for_each`; the topic access policy stays an opaque JSON string (mirroring how AWS itself treats SNS policies) rather than a structured object, keeping the variable surface simple while preserving full policy control; Lambda and Firehose subscription targets are accepted as plain ARN strings today so this module needs no change once `tf-mod-aws-lambda` (Phase 7) ships.
+Other principles: subscriptions modeled as `map(object(...))` keyed by a caller-chosen stable name (never a list) so adding/removing one subscription never perturbs the others under `for_each`; the topic access policy stays an opaque JSON string (mirroring how AWS itself treats SNS policies) rather than a structured object, keeping the variable surface simple while preserving full policy control; Lambda and Firehose subscription targets are accepted as plain ARN strings today so this module needs no change once `terraform-aws-lambda` (Phase 7) ships.
 
 ---
 
@@ -789,7 +789,7 @@ tags_all = { "Environment" = "prod", "CostCenter" = "billing" }
 
 - **Tag drift / unexpected tags:** Caused by `default_tags` overlap. `tags_all` merges the topic's resource tags over provider `default_tags` with resource tags winning — if a value differs from what you set, a `default_tags` entry is colliding. Only `aws_sns_topic` carries tags in this composite.
 - **Credential-chain failures (`NoCredentialProviders` / `ExpiredToken`):** No valid credentials resolved. Set `AWS_PROFILE`, refresh SSO, or confirm the OIDC role assumption in CI. The module never takes credentials as variables.
-- **`KMS.AccessDeniedException` at publish/subscribe time (not at `apply`):** The CMK's key policy does not trust `sns.amazonaws.com` or the calling principal. This module only validates the key reference (`kms:DescribeKey`) — grant `kms:Decrypt`/`kms:GenerateDataKey*` on the **key policy** itself (`tf-mod-aws-kms`).
+- **`KMS.AccessDeniedException` at publish/subscribe time (not at `apply`):** The CMK's key policy does not trust `sns.amazonaws.com` or the calling principal. This module only validates the key reference (`kms:DescribeKey`) — grant `kms:Decrypt`/`kms:GenerateDataKey*` on the **key policy** itself (`terraform-aws-kms`).
 - **Subscription stuck `PendingConfirmation` forever:** Expected for `http`/`https`/`email`/`email-json` without `endpoint_auto_confirms = true` — Terraform cannot complete this handshake. Confirm manually (click the email link / visit the `SubscribeURL`) or set `endpoint_auto_confirms = true` only for endpoints that genuinely auto-confirm.
 - **`firehose` subscription fails at `plan` with a validation error:** `subscription_role_arn` is required whenever `protocol = "firehose"` — this module enforces it in a `variable` `validation {}` block so the failure surfaces before `apply`, not as an opaque AWS API error.
 - **`region / us-east-1` errors:** Not applicable — SNS has no global-resource coupling; if you see a region mismatch error it is almost always a cross-region subscription using the wrong provider (see AWS Prerequisites).
@@ -806,7 +806,7 @@ tags_all = { "Environment" = "prod", "CostCenter" = "billing" }
 - AWS — *Amazon SNS FIFO topics* and *Enabling high throughput for FIFO topics* (Developer Guide)
 - AWS — *Confirm your subscription* / *HTTP(S) endpoint subscription confirmation* (Developer Guide)
 - AWS — *Amazon SNS identity-based policies* (Developer Guide)
-- — `tf-mod-aws-kms`, `tf-mod-aws-iam-role`, `tf-mod-aws-sqs`, `tf-mod-aws-kinesis-firehose` (sibling modules)
+- — `terraform-aws-kms`, `terraform-aws-iam-role`, `terraform-aws-sqs`, `terraform-aws-kinesis-firehose` (sibling modules)
 
 ---
 

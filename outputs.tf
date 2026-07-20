@@ -7,7 +7,7 @@ output "id" {
 The ARN of the SNS topic. NOTE: for aws_sns_topic, id and arn are the
 IDENTICAL value -- SNS has no separate short resource id. Emitted anyway per
 the house id + arn output convention so this module's contract matches every
-other tf-mod-aws-* module.
+other terraform-aws-* module.
 EOT
  value = aws_sns_topic.this.id
 }
@@ -15,8 +15,8 @@ EOT
 output "arn" {
  description = <<EOT
 The ARN of the SNS topic (arn:aws:sns:<region>:<account-id>:<name>) -- the
-cross-resource reference type. Consumed by tf-mod-aws-sqs (queue policy
-Condition.ArnEquals), tf-mod-aws-iam-policy (publish/subscribe grants),
+cross-resource reference type. Consumed by terraform-aws-sqs (queue policy
+Condition.ArnEquals), terraform-aws-iam-policy (publish/subscribe grants),
 CloudWatch alarm actions, and Lambda event-source / DLQ targets.
 EOT
  value = aws_sns_topic.this.arn
